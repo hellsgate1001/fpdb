@@ -574,7 +574,7 @@ class Merge(HandHistoryConverter):
     re_SplitHands = re.compile(r'</game>\n+(?=<game)')
     re_TailSplitHands = re.compile(r'(</game>)')
     re_GameInfo = re.compile(r'<description type="(?P<GAME>Holdem|Holdem\sTournament|Omaha|Omaha\sTournament|Omaha\sH/L8|2\-7\sLowball|A\-5\sLowball|Badugi|5\-Draw\sw/Joker|5\-Draw|7\-Stud|7\-Stud\sH/L8|5\-Stud|Razz|HORSE)" stakes="(?P<LIMIT>[a-zA-Z ]+)(\s\(?\$?(?P<SB>[.0-9]+)?/?\$?(?P<BB>[.0-9]+)?(?P<blah>.*)\)?)?"/>', re.MULTILINE)
-    re_HandInfo = re.compile(r'<game id="(?P<HID1>[0-9]+)-(?P<HID2>[0-9]+)" starttime="(?P<DATETIME>[0-9]+)" numholecards="[0-9]+" gametype="[0-9]+" (multigametype="(?P<MULTIGAMETYPE>\d+)" )?(seats="(?P<SEATS>[0-9]+)" )?realmoney="(?P<REALMONEY>(true|false))" data="[0-9]+\|(?P<TABLE>[^|]+)\|(?P<TOURNO>\d+)?.*>', re.MULTILINE)
+    re_HandInfo =     re.compile(r'<game id="(?P<HID1>[0-9]+)-(?P<HID2>[0-9]+)" starttime="(?P<DATETIME>[0-9]+)" numholecards="[0-9]+" gametype="[0-9]+" (multigametype="(?P<MULTIGAMETYPE>\d+)" )?(seats="(?P<SEATS>[0-9]+)" )?realmoney="(?P<REALMONEY>(true|false))" data="[0-9]+\|(((?P<TABLENAME>[^|]+)\|(?P<TOURNO>\d+)\-(?P<TABLENO>\d+))|((?P<RTABLENAME>[^|]+)\|(?P<RTOURNO>\d+)))?.*>', re.MULTILINE)
     re_Button = re.compile(r'<players dealer="(?P<BUTTON>[0-9]+)">')
     re_PlayerInfo = re.compile(r'<player seat="(?P<SEAT>[0-9]+)" nickname="(?P<PNAME>.+)" balance="\$(?P<CASH>[.0-9]+)" dealtin="(?P<DEALTIN>(true|false))" />', re.MULTILINE)
     re_Board = re.compile(r'<cards type="COMMUNITY" cards="(?P<CARDS>[^"]+)"', re.MULTILINE)
@@ -605,9 +605,9 @@ class Merge(HandHistoryConverter):
 
     def playerNameFromSeatNo(self, seatNo, hand):
         # This special function is required because Merge Poker records
-        # actions by seat number, not by the player's name
+        # actions by seat number (0 based), not by the player's name
         for p in hand.players:
-            if p[0] == int(seatNo):
+            if p[0] == int(seatNo)+1:
                 return p[1]
 
     def readSupportedGames(self):
@@ -696,22 +696,28 @@ or None if we fail to get the info """
             logging.info(_("No match in readHandInfo: '%s'") % hand.handText[0:100])
             logging.info(hand.handText)
             raise FpdbParseError(_("No match in readHandInfo: '%s'") % hand.handText[0:100])
-        logging.debug("HID %s-%s, Table %s" % (m.group('HID1'),
-                      m.group('HID2'), m.group('TABLE')[:-1]))
+
         hand.handid = m.group('HID1') + m.group('HID2')
+            
         if hand.gametype['type'] == 'tour':
-            hand.tablename = m.group('TABLE').strip()
+            logging.debug("HID %s-%s, Table %s" % (m.group('HID1'),
+                                                   m.group('HID2'), m.group('TABLENO')[:-1]))
+            self.info['tablename'] = m.group('TABLENAME')
             hand.tourNo = m.group('TOURNO')
-            if hand.tablename in self.SnG_Structures:
-                hand.buyin = int(100*self.SnG_Structures[hand.tablename]['buyIn'])
-                hand.fee   = int(100*self.SnG_Structures[hand.tablename]['fee'])
+            # TABLENO is always "1" for MTTs, but Database.py get_table_info wants a number here
+            # so we use it, but do not use it for finding the table window. If HH changes, this will
+            # be correct then too, and getTitleRe() will have to start using the passed in table_number.
+            hand.tablename = m.group('TABLENO').strip()
+            if self.info['tablename'] in self.SnG_Structures:
+                hand.buyin = int(100*self.SnG_Structures[self.info['tablename']]['buyIn'])
+                hand.fee   = int(100*self.SnG_Structures[self.info['tablename']]['fee'])
                 hand.buyinCurrency="USD"
-            elif hand.tablename in self.MTT_Structures:
-                hand.buyin = int(100*self.MTT_Structures[hand.tablename]['buyIn'])
-                hand.fee   = int(100*self.MTT_Structures[hand.tablename]['fee'])
+            elif self.info['tablename'] in self.MTT_Structures:
+                hand.buyin = int(100*self.MTT_Structures[self.info['tablename']]['buyIn'])
+                hand.fee   = int(100*self.MTT_Structures[self.info['tablename']]['fee'])
                 hand.buyinCurrency="USD"
             else:
-                m1 = self.re_Buyin.search(hand.tablename)
+                m1 = self.re_Buyin.search(self.info['tablename'])
                 if m1:
                     if m1.group('FREEROLL'):
                         hand.buyin = 0
@@ -723,9 +729,12 @@ or None if we fail to get the info """
                         hand.fee = int(100*Decimal(buyin)/10)
                         hand.buyinCurrency="USD"
                 else:
-                    raise FpdbParseError(_("No match in MTT or SnG Structures: '%s' %s") % (hand.tablename, hand.tourNo))
+                    raise FpdbParseError(_("No match in MTT or SnG Structures: '%s' %s") % (self.info['tablename'], hand.tourNo))
         else:
-            hand.tablename = m.group('TABLE')
+            logging.debug("HID %s-%s, Table %s" % (m.group('HID1'),
+                                                   m.group('HID2'), m.group('RTABLENAME')[:-1]))
+            hand.tablename = m.group('RTABLENAME')
+
         hand.startTime = datetime.datetime.strptime(m.group('DATETIME')[:12],'%Y%m%d%H%M')
         # Check that the hand is complete up to the awarding of the pot; if
         # not, the hand is unparseable
@@ -747,6 +756,7 @@ or None if we fail to get the info """
             for action in m2:
                 acted[action.group('PSEAT')] = True
                 if len(seated) == len(acted): # We've faound all players
+                    fulltable = True
                     break
             if fulltable != True:
                 for seatno in seated.keys():
@@ -759,7 +769,7 @@ or None if we fail to get the info """
 
         for seat in seated:
             name, stack = seated[seat]
-            hand.addPlayer(int(seat), name, stack)
+            hand.addPlayer(int(seat)+1, name, stack) # Merge numbers seats starting at 0
 
         # No players found at all.
         if not hand.players:
@@ -985,3 +995,13 @@ or None if we fail to get the info """
 
         raise FpdbHandPartial("Partial hand history: %s '%s' %s" % (function, hand.handid, message))
 
+    @staticmethod
+    def getTableTitleRe(type, table_name=None, tournament = None, table_number=None):
+        "Returns string to search in windows titles"
+        if type=="tour":
+            # BAD! Merge HH doesn't have correct table_number for MTTs, but has it in the title
+            # so we cannot look for it, which means that HUD will find the first window for the
+            # MTT tournament and pick that as the one to use. Can't fix without change to HH
+            return ( ".+\(" + re.escape(str(tournament)) + "\)\ \-\ \Table \d+" )
+        else:
+            return re.escape(table_name)
