@@ -298,13 +298,13 @@ class Merge(HandHistoryConverter):
                         '$3,500 VIP Freeroll' : {'buyIn': 0, 'fee': 0, 'currency': 'USD'},
                         '$750 VIP Freeroll' : {'buyIn': 0, 'fee': 0, 'currency': 'USD'},
                         '$2,500 VIP Freeroll' : {'buyIn': 0, 'fee': 0, 'currency': 'USD'},
-                        '$200 Freeroll - NL Holdem - 20:00' : {'buyIn': 0, 'fee': 0, 'currency': 'USD'},
-                        '$200 Freeroll - PL Omaha - 18:00' : {'buyIn': 0, 'fee': 0, 'currency': 'USD'},
+                        '$200 Freeroll - NL Holdem - 20%3A00' : {'buyIn': 0, 'fee': 0, 'currency': 'USD'},
+                        '$200 Freeroll - PL Omaha - 18%3A00' : {'buyIn': 0, 'fee': 0, 'currency': 'USD'},
                         '100 Seats to $100k Freeroll' : {'buyIn': 0, 'fee': 0, 'currency': 'USD'},
                         'Daily First Deposit Freeroll - Saturday' : {'buyIn': 0, 'fee': 0, 'currency': 'USD'},
-                        '$200 Freeroll - HORSE - 12:00' : {'buyIn': 0, 'fee': 0, 'currency': 'USD'},
-                        '$200 Freeroll - NL Holdem - 06:00' : {'buyIn': 0, 'fee': 0, 'currency': 'USD'},
-                        '$200 Freeroll - NL Holdem - 00:00' : {'buyIn': 0, 'fee': 0, 'currency': 'USD'} 
+                        '$200 Freeroll - HORSE - 12%3A00' : {'buyIn': 0, 'fee': 0, 'currency': 'USD'},
+                        '$200 Freeroll - NL Holdem - 06%3A00' : {'buyIn': 0, 'fee': 0, 'currency': 'USD'},
+                        '$200 Freeroll - NL Holdem - 00%3A00' : {'buyIn': 0, 'fee': 0, 'currency': 'USD'} 
                      }
     
     SnG_Structures = {  '$1 NL Holdem Double Up - 10 Handed'    : {'buyIn': 1,   'fee': 0.08, 'currency': 'USD', 'seats': 10, 'multi': False, 'payoutCurrency': 'USD', 'payouts': (2,2,2,2,2)},
@@ -574,7 +574,10 @@ class Merge(HandHistoryConverter):
     re_SplitHands = re.compile(r'</game>\n+(?=<game)')
     re_TailSplitHands = re.compile(r'(</game>)')
     re_GameInfo = re.compile(r'<description type="(?P<GAME>Holdem|Holdem\sTournament|Omaha|Omaha\sTournament|Omaha\sH/L8|2\-7\sLowball|A\-5\sLowball|Badugi|5\-Draw\sw/Joker|5\-Draw|7\-Stud|7\-Stud\sH/L8|5\-Stud|Razz|HORSE)" stakes="(?P<LIMIT>[a-zA-Z ]+)(\s\(?\$?(?P<SB>[.0-9]+)?/?\$?(?P<BB>[.0-9]+)?(?P<blah>.*)\)?)?"/>', re.MULTILINE)
-    re_HandInfo =     re.compile(r'<game id="(?P<HID1>[0-9]+)-(?P<HID2>[0-9]+)" starttime="(?P<DATETIME>[0-9]+)" numholecards="[0-9]+" gametype="[0-9]+" (multigametype="(?P<MULTIGAMETYPE>\d+)" )?(seats="(?P<SEATS>[0-9]+)" )?realmoney="(?P<REALMONEY>(true|false))" data="[0-9]+\|(((?P<TABLENAME>[^|]+)\|(?P<TOURNO>\d+)\-(?P<TABLENO>\d+))|((?P<RTABLENAME>[^|]+)\|(?P<RTOURNO>\d+)))?.*>', re.MULTILINE)
+    # <game id="46154255-645" starttime="20111230232051" numholecards="2" gametype="1" seats="9" realmoney="false" data="20111230|Play Money (46154255)|46154255|46154255-645|false">
+    # <game id="46165919-1" starttime="20111230161824" numholecards="2" gametype="23" seats="10" realmoney="true" data="20111230|Fun Step 1|46165833-1|46165919-1|true">
+    # <game id="46289039-1" starttime="20120101200100" numholecards="2" gametype="23" seats="9" realmoney="true" data="20120101|$200 Freeroll - NL Holdem - 20%3A00|46245544-1|46289039-1|true">
+    re_HandInfo = re.compile(r'<game id="(?P<HID1>[0-9]+)-(?P<HID2>[0-9]+)" starttime="(?P<DATETIME>[0-9]+)" numholecards="[0-9]+" gametype="[0-9]+" (multigametype="(?P<MULTIGAMETYPE>\d+)" )?(seats="(?P<SEATS>[0-9]+)" )?realmoney="(?P<REALMONEY>(true|false))" data="[0-9]+\|(?P<TABLENAME>[^|]+)\|(?P<TDATA>[^|]+)\|?.*>', re.MULTILINE)
     re_Button = re.compile(r'<players dealer="(?P<BUTTON>[0-9]+)">')
     re_PlayerInfo = re.compile(r'<player seat="(?P<SEAT>[0-9]+)" nickname="(?P<PNAME>.+)" balance="\$(?P<CASH>[.0-9]+)" dealtin="(?P<DEALTIN>(true|false))" />', re.MULTILINE)
     re_Board = re.compile(r'<cards type="COMMUNITY" cards="(?P<CARDS>[^"]+)"', re.MULTILINE)
@@ -664,7 +667,6 @@ or None if we fail to get the info """
             self.info['limitType'] = self.limits[mg['LIMIT']]
         if 'GAME' in mg:
             if mg['GAME'] == "HORSE":
-                m2 = self.re_HandInfo.search(handText)
                 (self.info['base'], self.info['category']) = self.Multigametypes[m2.group('MULTIGAMETYPE')]
             else:
                 (self.info['base'], self.info['category']) = self.games[mg['GAME']]
@@ -698,16 +700,13 @@ or None if we fail to get the info """
             raise FpdbParseError(_("No match in readHandInfo: '%s'") % hand.handText[0:100])
 
         hand.handid = m.group('HID1') + m.group('HID2')
-            
+
         if hand.gametype['type'] == 'tour':
-            logging.debug("HID %s-%s, Table %s" % (m.group('HID1'),
-                                                   m.group('HID2'), m.group('TABLENO')[:-1]))
+            tid, table = re.split('-', m.group('TDATA'))
+            logging.info("HID %s-%s, Tourney %s Table %s" % (m.group('HID1'), m.group('HID2'), tid, table))
             self.info['tablename'] = m.group('TABLENAME')
-            hand.tourNo = m.group('TOURNO')
-            # TABLENO is always "1" for MTTs, but Database.py get_table_info wants a number here
-            # so we use it, but do not use it for finding the table window. If HH changes, this will
-            # be correct then too, and getTitleRe() will have to start using the passed in table_number.
-            hand.tablename = m.group('TABLENO').strip()
+            hand.tourNo = tid
+            hand.tablename = table
             if self.info['tablename'] in self.SnG_Structures:
                 hand.buyin = int(100*self.SnG_Structures[self.info['tablename']]['buyIn'])
                 hand.fee   = int(100*self.SnG_Structures[self.info['tablename']]['fee'])
@@ -731,9 +730,8 @@ or None if we fail to get the info """
                 else:
                     raise FpdbParseError(_("No match in MTT or SnG Structures: '%s' %s") % (self.info['tablename'], hand.tourNo))
         else:
-            logging.debug("HID %s-%s, Table %s" % (m.group('HID1'),
-                                                   m.group('HID2'), m.group('RTABLENAME')[:-1]))
-            hand.tablename = m.group('RTABLENAME')
+            logging.debug("HID %s-%s, Table %s" % (m.group('HID1'), m.group('HID2'), m.group('TABLENAME')))
+            hand.tablename = m.group('TABLENAME')
 
         hand.startTime = datetime.datetime.strptime(m.group('DATETIME')[:12],'%Y%m%d%H%M')
         # Check that the hand is complete up to the awarding of the pot; if
@@ -769,7 +767,8 @@ or None if we fail to get the info """
 
         for seat in seated:
             name, stack = seated[seat]
-            hand.addPlayer(int(seat)+1, name, stack) # Merge numbers seats starting at 0
+            # Merge indexes seats from 0. Add 1 so we don't have to add corner cases everywhere else.
+            hand.addPlayer(int(seat) + 1, name, stack)
 
         # No players found at all.
         if not hand.players:
@@ -890,39 +889,40 @@ or None if we fail to get the info """
                 m = self.re_HeroCards.finditer(hand.streets[street])
                 for found in m:
                     player = self.playerNameFromSeatNo(found.group('PSEAT'), hand)
-                    if found.group('CARDS') is None:
-                        cards    = []
-                        newcards = []
-                        oldcards = []
-                    else:
-                        if hand.gametype['base'] == 'stud':
-                            cards = found.group('CARDS').replace('null,', '').replace(',null','').split(',')
-                            oldcards = cards[:-1]
-                            newcards = [cards[-1]]
-                        else:
-                            cards = found.group('CARDS').split(',')
-                            oldcards = cards
+                    if player in hand.stacks:
+                        if found.group('CARDS') is None:
+                            cards    = []
                             newcards = []
-                    if street == 'THIRD' and len(cards) == 3: # hero in stud game
-                        hand.hero = player
-                        herocards = cards
-                        hand.dealt.add(hand.hero) # need this for stud??
-                        hand.addHoleCards(street, player, closed=oldcards, open=newcards, shown=False, mucked=False, dealt=False)
-                    elif (cards != herocards and hand.gametype['base'] == 'stud'):
-                        if hand.hero == player:
-                            herocards = cards
-                            hand.addHoleCards(street, player, closed=oldcards, open=newcards, shown=False, mucked=False, dealt=False)
-                        elif (len(cards)<5):
-                            if street == 'SEVENTH':
-                                oldcards = []
+                            oldcards = []
+                        else:
+                            if hand.gametype['base'] == 'stud':
+                                cards = found.group('CARDS').replace('null,', '').replace(',null','').split(',')
+                                oldcards = cards[:-1]
+                                newcards = [cards[-1]]
+                            else:
+                                cards = found.group('CARDS').split(',')
+                                oldcards = cards
                                 newcards = []
+                        if street == 'THIRD' and len(cards) == 3: # hero in stud game
+                            hand.hero = player
+                            herocards = cards
+                            hand.dealt.add(hand.hero) # need this for stud??
                             hand.addHoleCards(street, player, closed=oldcards, open=newcards, shown=False, mucked=False, dealt=False)
-                        elif (len(cards)==7):
-                            for street in hand.holeStreets:
-                                hand.holecards[street][player] = [[], []]
-                            hand.addHoleCards(street, player, closed=cards, open=[], shown=False, mucked=False, dealt=False)
-                    elif (hand.gametype['base'] == 'draw'):
-                        hand.addHoleCards(street, player, closed=oldcards, open=newcards, shown=False, mucked=False, dealt=False)
+                        elif (cards != herocards and hand.gametype['base'] == 'stud'):
+                            if hand.hero == player:
+                                herocards = cards
+                                hand.addHoleCards(street, player, closed=oldcards, open=newcards, shown=False, mucked=False, dealt=False)
+                            elif (len(cards)<5):
+                                if street == 'SEVENTH':
+                                    oldcards = []
+                                    newcards = []
+                                hand.addHoleCards(street, player, closed=oldcards, open=newcards, shown=False, mucked=False, dealt=False)
+                            elif (len(cards)==7):
+                                for street in hand.holeStreets:
+                                    hand.holecards[street][player] = [[], []]
+                                hand.addHoleCards(street, player, closed=cards, open=[], shown=False, mucked=False, dealt=False)
+                        elif (hand.gametype['base'] == 'draw'):
+                            hand.addHoleCards(street, player, closed=oldcards, open=newcards, shown=False, mucked=False, dealt=False)
 
     def readAction(self, hand, street):
         logging.debug("readAction (%s)" % street)
@@ -930,27 +930,28 @@ or None if we fail to get the info """
         for action in m:
             logging.debug("%s %s" % (action.group('ATYPE'), action.groupdict()))
             player = self.playerNameFromSeatNo(action.group('PSEAT'), hand)
-            if action.group('ATYPE') == 'RAISE':
-                hand.addRaiseTo(street, player, action.group('BET'))
-            elif action.group('ATYPE') == 'COMPLETE':
-                if hand.gametype['base'] != 'stud':
+            if player in hand.stacks:
+                if action.group('ATYPE') == 'RAISE':
                     hand.addRaiseTo(street, player, action.group('BET'))
+                elif action.group('ATYPE') == 'COMPLETE':
+                    if hand.gametype['base'] != 'stud':
+                        hand.addRaiseTo(street, player, action.group('BET'))
+                    else:
+                        hand.addComplete( street, player, action.group('BET') )
+                elif action.group('ATYPE') == 'CALL':
+                    hand.addCall(street, player, action.group('BET'))
+                elif action.group('ATYPE') == 'BET':
+                    hand.addBet(street, player, action.group('BET'))
+                elif action.group('ATYPE') in ('FOLD', 'SIT_OUT'):
+                    hand.addFold(street, player)
+                elif action.group('ATYPE') == 'CHECK':
+                    hand.addCheck(street, player)
+                elif action.group('ATYPE') == 'ALL_IN':
+                    hand.addAllIn(street, player, action.group('BET'))
+                elif action.group('ATYPE') == 'DRAW':
+                    hand.addDiscard(street, player, action.group('TXT'))
                 else:
-                    hand.addComplete( street, player, action.group('BET') )
-            elif action.group('ATYPE') == 'CALL':
-                hand.addCall(street, player, action.group('BET'))
-            elif action.group('ATYPE') == 'BET':
-                hand.addBet(street, player, action.group('BET'))
-            elif action.group('ATYPE') in ('FOLD', 'SIT_OUT'):
-                hand.addFold(street, player)
-            elif action.group('ATYPE') == 'CHECK':
-                hand.addCheck(street, player)
-            elif action.group('ATYPE') == 'ALL_IN':
-                hand.addAllIn(street, player, action.group('BET'))
-            elif action.group('ATYPE') == 'DRAW':
-                hand.addDiscard(street, player, action.group('TXT'))
-            else:
-                logging.debug(_("Unimplemented %s: '%s' '%s'") % ("readAction", action.group('PSEAT'), action.group('ATYPE')))
+                    logging.debug(_("Unimplemented %s: '%s' '%s'") % ("readAction", action.group('PSEAT'), action.group('ATYPE')))
 
     def readShowdownActions(self, hand):
         for street in ('RIVER', 'SEVENTH', 'DRAWTHREE'):
@@ -999,9 +1000,10 @@ or None if we fail to get the info """
     def getTableTitleRe(type, table_name=None, tournament = None, table_number=None):
         "Returns string to search in windows titles"
         if type=="tour":
-            # BAD! Merge HH doesn't have correct table_number for MTTs, but has it in the title
-            # so we cannot look for it, which means that HUD will find the first window for the
-            # MTT tournament and pick that as the one to use. Can't fix without change to HH
-            return ( ".+\(" + re.escape(str(tournament)) + "\)\ \-\ \Table \d+" )
+            # Ignoring table number as it doesn't appear to be in the window title
+            # "$200 Freeroll - NL Holdem - 20:00 (46302299) - Table 1" -- the table number doesn't matter, it seems to always be 1 in the HH.
+            # "Fun Step 1 (4358174) - Table 1"
+            return ( "\(" + re.escape(str(tournament)) + "\)")
         else:
+            # "Play Money (4631994)"
             return re.escape(table_name)

@@ -1078,11 +1078,9 @@ Left-Drag to Move"
 
     <supported_games>
         <!-- holdem
-             playershort    n         blank
-             vpip           pfr       agg_fact
-             three_B        ffreq1    f_3bet
-             cb1            cb2       steal
-
+             vpip  pfr          three_B
+             n     playershort  cb1
+             wtsd  steal        totalprofit
           -->
         <game aux="mucked" cols="3" db="fpdb" game_name="holdem" rows="3">
 	  <stat click="tog_decorate" col="0" popup="default" row="0" stat_name="playershort" tip="tip1"/>
