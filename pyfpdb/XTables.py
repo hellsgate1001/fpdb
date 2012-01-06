@@ -35,6 +35,7 @@ import gtk
 import wnck
 
 #    FPDB modules
+from XTableFinder import TableFinder
 from TableWindow import Table_Window
 import Configuration
 
@@ -93,8 +94,18 @@ class Table(Table_Window):
                 break
 
         if self.number is None:
-            log.warning(_("No match in XTables for table '%s'.") % self.search_string)
-            return None
+            tf = TableFinder("Click on the poker table for " + self.site, self.name)
+            r = tf.run()
+            if r is not None:
+                self.wnck_table_w = tf.w_table_w
+                self.number = tf.hwnd
+                self.title = tf.table_window_name
+                # XID is a consistent key
+                WNCK_XTABLES.add(self.number)
+
+            if self.number is None:
+                log.warning(_("No match in XTables for table '%s'.") % self.search_string)
+                return None
 
 #    def get_window_from_xid(self, id):
 #        for outside in root.query_tree().children:
