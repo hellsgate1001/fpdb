@@ -595,7 +595,7 @@ class Merge(HandHistoryConverter):
     re_Action = re.compile(r'<event sequence="[0-9]+" type="(?P<ATYPE>FOLD|CHECK|CALL|BET|RAISE|ALL_IN|SIT_OUT|DRAW|COMPLETE)"( timestamp="(?P<TIMESTAMP>[0-9]+)")? player="(?P<PSEAT>[0-9])"( amount="(?P<BET>[.0-9]+)")?( text="(?P<TXT>.+)")?/>', re.MULTILINE)
     re_AllActions = re.compile(r'<event sequence="[0-9]+" type="(?P<ATYPE>FOLD|CHECK|CALL|BET|RAISE|ALL_IN|SIT_OUT|DRAW|COMPLETE|BIG_BLIND|INITIAL_BLIND|SMALL_BLIND|RETURN_BLIND|BRING_IN|ANTE)"( timestamp="(?P<TIMESTAMP>[0-9]+)")? player="(?P<PSEAT>[0-9])"( amount="(?P<BET>[.0-9]+)")?( text="(?P<TXT>.+)")?/>', re.MULTILINE)
     re_ShowdownAction = re.compile(r'<cards type="SHOWN" cards="(?P<CARDS>..,..)" player="(?P<PSEAT>[0-9])"/>', re.MULTILINE)
-    re_CollectPot = re.compile(r'<winner amount="(?P<POT>[.0-9]+)" uncalled="false" potnumber="[0-9]+" player="(?P<PSEAT>[0-9])"', re.MULTILINE)
+    re_CollectPot = re.compile(r'<winner amount="(?P<POT>[.0-9]+)" uncalled="(?P<UNCALLED>false|true)" potnumber="[0-9]+" player="(?P<PSEAT>[0-9])"', re.MULTILINE)
     re_SitsOut = re.compile(r'<event sequence="[0-9]+" type="SIT_OUT" player="(?P<PSEAT>[0-9])"/>', re.MULTILINE)
     re_ShownCards = re.compile(r'<cards type="(SHOWN|MUCKED)" cards="(?P<CARDS>.+)" player="(?P<PSEAT>[0-9])"/>', re.MULTILINE)
     re_Connection  = re.compile(r'<event sequence="[0-9]+" type="(?P<TYPE>RECONNECTED|DISCONNECTED)" timestamp="[0-9]+" player="[0-9]"/>', re.MULTILINE)
@@ -699,6 +699,9 @@ or None if we fail to get the info """
             logging.info(hand.handText)
             raise FpdbParseError(_("No match in readHandInfo: '%s'") % hand.handText[0:100])
 
+        #mg = m.groupdict()
+        #print "DEBUG: mg: %s" % mg
+
         hand.handid = m.group('HID1') + m.group('HID2')
 
         if hand.gametype['type'] == 'tour':
@@ -711,6 +714,7 @@ or None if we fail to get the info """
                 hand.buyin = int(100*self.SnG_Structures[self.info['tablename']]['buyIn'])
                 hand.fee   = int(100*self.SnG_Structures[self.info['tablename']]['fee'])
                 hand.buyinCurrency="USD"
+                hand.maxseats = self.SnG_Structures[self.info['tablename']]['seats']
             elif self.info['tablename'] in self.MTT_Structures:
                 hand.buyin = int(100*self.MTT_Structures[self.info['tablename']]['buyIn'])
                 hand.fee   = int(100*self.MTT_Structures[self.info['tablename']]['fee'])
@@ -966,7 +970,7 @@ or None if we fail to get the info """
             pot = m.group('POT')
             committed = sorted([ (v,k) for (k,v) in hand.pot.committed.items()])
             lastbet = committed[-1][0] - committed[-2][0]
-            if lastbet > 0: # uncalled
+            if lastbet > 0 and m.group('UNCALLED')=='false': # uncalled
                 pot = str(Decimal(m.group('POT')) - lastbet)
             #print "DEBUG: addCollectPot(%s, %s)" %(pname, m.group('POT'))
             hand.addCollectPot(player=pname, pot=pot)

@@ -271,11 +271,22 @@ class OnGame(HandHistoryConverter):
                            r"(Dealing 6th street(?P<SIXTH>.+(?=Dealing river)|.+))?"
                            r"(Dealing river(?P<SEVENTH>.+))?", hand.handText,re.DOTALL)
         elif hand.gametype['base'] in ("draw"):
+            # isolate the first discard/stand pat line
+            discard_split = re.split(r"(?:(.+(?: changed).+))", hand.handText,re.DOTALL)
+            if len(hand.handText) == len(discard_split[0]):
+                # handText was not split, no DRAW street occurred
+                pass
+            else:
+                # DRAW street found, reassemble, with DRAW marker added
+                discard_split[0] += "*** DRAW ***\r\n"
+                hand.handText = ""
+                for i in discard_split:
+                    hand.handText += i
             m =  re.search(r"(?P<PREDEAL>.+(?=Dealing pocket cards)|.+)"
-                           r"(Dealing pocket cards(?P<DEAL>.*?(?=\-\-\-\n|\-\-\-\s*Summary:)))?"
-                           r"(\-\-\-\n(?P<DRAWONE>.*?(?=\-\-\-\n|\-\-\-\s*Summary:)))?"
-                           r"(\-\-\-\n(?P<DRAWTWO>.*?(?=\-\-\-\n|\-\-\-\s*Summary:)))?"
-                           r"(\-\-\-\n(?P<DRAWTHREE>.*?(?=\-\-\-\s*Summary:)))?", hand.handText,re.DOTALL)
+                           r"(Dealing pocket cards(?P<DEAL>.*(?=\*\*\* DRAW \*\*\*)|.+))?"
+                           r"(\*\*\* DRAW \*\*\*(?P<DRAWONE>.+))?", hand.handText,re.DOTALL)
+        #import pprint
+        #pprint.pprint(m.groupdict())
 
         hand.addStreets(m)
 
@@ -357,7 +368,6 @@ class OnGame(HandHistoryConverter):
                         hand.addHoleCards(street, player, closed=newcards, shown=False, mucked=False, dealt=False)
 
     def readAction(self, hand, street):
-        i, d = 0, 0
         m = self.re_Action.finditer(hand.streets[street])
         for action in m:
             #acts = action.groupdict()
@@ -365,30 +375,15 @@ class OnGame(HandHistoryConverter):
             
             if action.group('ATYPE') == ' raises':
                 hand.addRaiseTo( street, action.group('PNAME'), action.group('BET2') )
-                i+=1
-                d=0
             elif action.group('ATYPE') == ' calls':
                 hand.addCall( street, action.group('PNAME'), action.group('BET') )
-                i+=1
-                d=0
             elif action.group('ATYPE') == ' bets':
                 hand.addBet( street, action.group('PNAME'), action.group('BET') )
-                i+=1
-                d=0
             elif action.group('ATYPE') == ' folds':
                 hand.addFold( street, action.group('PNAME'))
-                i+=1
-                d=0
             elif action.group('ATYPE') == ' checks':
                 hand.addCheck( street, action.group('PNAME'))
-                i+=1
-                d=0
             elif action.group('ATYPE') == ' changed':
-                if i>0 and d==0:
-                    idx = hand.allStreets.index(street)+1
-                    if idx<4: street = hand.allStreets[idx]
-                    i=0
-                d+=1
                 if int(action.group('BET'))>0:
                     hand.addDiscard(street, action.group('PNAME'), action.group('BET'))
                 else:
